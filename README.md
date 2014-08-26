@@ -1,4 +1,4 @@
 railsauth
 =========
 
-A sample Ruby on Rails Authentication App
+A sample Ruby on Rails Authentication App.
