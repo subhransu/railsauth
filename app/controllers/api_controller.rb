@@ -1,6 +1,4 @@
-class ApiController < ApplicationController
-  protect_from_forgery with: :null_session  
-  
+class ApiController < ApplicationController  
   before_action :signup_key_verification, :only => [:signup, :signin, :get_token]
   
   def signup
@@ -145,15 +143,96 @@ class ApiController < ApplicationController
   end
   
   def upload_photo
-    
+    if request.post?
+      if params[:authtoken] && params[:title] && params[:image]
+        user = User.where(:api_authtoken => params[:authtoken]).first
+          
+        if user && user.authtoken_expiry > Time.now
+          if user.photos.count < 3
+            rand_id = rand_string(20)
+            image_name = params[:image].original_filename
+            image = Magick::Image.from_blob(params[:image].read).first          
+          
+            img_public_path = "/public/uploads/#{rand_id}.png"
+            image_local_file_path = File.join(Rails.root, img_public_path)
+            image.write(image_local_file_path)
+          
+            photo = Photo.new(:name => image_name, :user_id => user.id, :title => params[:title], :image_url => "/uploads/#{rand_id}.png", :random_id => rand_id)
+          
+            if photo.save
+              render :json => photo.to_json
+            else
+              error_str = ""
+
+              @user.errors.each{|attr, msg|           
+                error_str += "#{attr} - #{msg},"
+              }
+                    
+              e = Error.new(:status => 400, :message => error_str)
+              render :json => e.to_json, :status => 400
+            end
+          else
+            e = Error.new(:status => 403, :message => "You have already uploaded 3 photos!")
+            render :json => e.to_json, :status => 403
+          end
+        else
+          e = Error.new(:status => 401, :message => "Authtoken is invalid or has expired. Kindly refresh the token and try again!")
+          render :json => e.to_json, :status => 401
+        end
+      else
+        e = Error.new(:status => 400, :message => "required parameters are missing")
+        render :json => e.to_json, :status => 400
+      end
+    end
   end
 
   def delete_photo
-    
+    if request.post?
+      if params[:authtoken] && params[:photo_id]
+        user = User.where(:api_authtoken => params[:authtoken]).first
+          
+        if user && user.authtoken_expiry > Time.now
+          photo = Photo.where(:random_id => params[:photo_id]).first
+          
+          if photo && photo.user_id == user.id            
+            img_public_path = "/public#{photo.image_url}"
+            image_local_file_path = File.join(Rails.root, img_public_path)
+            
+            File.delete(image_local_file_path) if File.exist?(image_local_file_path)
+            photo.destroy
+            
+            m = Message.new(:status => 200, :message => "Image is deleted.")          
+            render :json => m.to_json, :status => 200  
+          else
+            e = Error.new(:status => 401, :message => "You don't have permission to delete this photo!")
+            render :json => e.to_json, :status => 401
+          end
+        else
+          e = Error.new(:status => 401, :message => "Authtoken is invalid or has expired. Kindly refresh the token and try again!")
+          render :json => e.to_json, :status => 401
+        end
+      else
+        e = Error.new(:status => 400, :message => "required parameters are missing")
+        render :json => e.to_json, :status => 400
+      end
+    end
   end
 
   def get_photos
-    
+    if params[:authtoken]
+      user = User.where(:api_authtoken => params[:authtoken]).first
+        
+      if user && user.authtoken_expiry > Time.now
+        photos = user.photos
+        render :json => photos.to_json, :status => 200          
+      else
+        e = Error.new(:status => 401, :message => "Authtoken is invalid or has expired. Kindly refresh the token and try again!")
+        render :json => e.to_json, :status => 401
+      end
+    else
+      e = Error.new(:status => 400, :message => "required parameters are missing")
+      render :json => e.to_json, :status => 400
+    end
   end
 
   private 
@@ -184,5 +263,9 @@ class ApiController < ApplicationController
   def user_params
     params.require(:user).permit(:first_name, :last_name, :email, :password, :password_hash, :password_salt, :verification_code, 
     :email_verification, :api_authtoken, :authtoken_expiry)
+  end
+  
+  def photo_params
+    params.require(:user).permit(:name, :title, :user_id, :image_url, :random_id)
   end
 end

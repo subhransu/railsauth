@@ -24,3 +24,6 @@ config/initializers/secret_token.rb
 
 # Schema.rb
 db/schema.rb
+
+#local photo uploads
+/public/uploads
