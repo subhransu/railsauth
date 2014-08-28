@@ -36,33 +36,31 @@ class ApiController < ApplicationController
   end
 
   def signin
-    if request.post?
-      if params && params[:email] && params[:password]      
-        user = User.where(:email => params[:email]).first
+    if params && params[:email] && params[:password]      
+      user = User.where(:email => params[:email]).first
       
-        if user         
-            if User.authenticate(params[:email], params[:password])            
-              if !user.authtoken_expiry || user.authtoken_expiry < Time.now
-                auth_token = rand_string(20)
-                auth_expiry = Time.now + (24*60*60)
+      if user         
+        if User.authenticate(params[:email], params[:password])            
+          if !user.authtoken_expiry || user.authtoken_expiry < Time.now
+            auth_token = rand_string(20)
+            auth_expiry = Time.now + (24*60*60)
           
-                user.update_attributes(:api_authtoken => auth_token, :authtoken_expiry => auth_expiry)          
-              end 
+            user.update_attributes(:api_authtoken => auth_token, :authtoken_expiry => auth_expiry)          
+          end 
             
-              render :json => user.to_json, :status => 200
-            else
-              e = Error.new(:status => 401, :message => "Wrong Password")
-              render :json => e.to_json, :status => 401
-            end
+          render :json => user.to_json, :status => 200
         else
-          e = Error.new(:status => 400, :message => "No user record found for this email ID")
-          render :json => e.to_json, :status => 400
+          e = Error.new(:status => 401, :message => "Wrong Password")
+          render :json => e.to_json, :status => 401
         end
       else
-        e = Error.new(:status => 400, :message => "required parameters are missing")
+        e = Error.new(:status => 400, :message => "No user record found for this email ID")
         render :json => e.to_json, :status => 400
       end
-    end    
+    else
+      e = Error.new(:status => 400, :message => "required parameters are missing")
+      render :json => e.to_json, :status => 400
+    end
   end
   
   def reset_password
