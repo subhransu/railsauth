@@ -1,3 +1,5 @@
+require "rmagick"
+
 class ApiController < ApplicationController  
   before_action :signup_key_verification, :only => [:signup, :signin, :get_token]
   
