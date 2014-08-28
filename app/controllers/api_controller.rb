@@ -1,5 +1,3 @@
-require 'RMagick'
-
 class ApiController < ApplicationController  
   before_action :signup_key_verification, :only => [:signup, :signin, :get_token]
   
@@ -153,7 +151,7 @@ class ApiController < ApplicationController
           if user.photos.count < 3
             rand_id = rand_string(20)
             image_name = params[:image].original_filename
-            image = Magick::Image.from_blob(params[:image].read).first          
+            image = MiniMagick::Image.read(params[:image].read)          
           
             img_public_path = "/public/uploads/#{rand_id}.png"
             image_local_file_path = File.join(Rails.root, img_public_path)
