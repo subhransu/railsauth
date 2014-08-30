@@ -172,7 +172,7 @@ class ApiController < ApplicationController
             else
               error_str = ""
 
-              user.errors.each{|attr, msg|           
+              photo.errors.each{|attr, msg|           
                 error_str += "#{attr} - #{msg},"
               }
                     
@@ -278,6 +278,10 @@ class ApiController < ApplicationController
   def user_params
     params.require(:user).permit(:first_name, :last_name, :email, :password, :password_hash, :password_salt, :verification_code, 
     :email_verification, :api_authtoken, :authtoken_expiry)
+  end
+  
+  def photo_params
+    params.require(:photo).permit(:name, :title, :user_id, :random_id, :image_url)
   end
     
 end
