@@ -12,14 +12,14 @@ class ApiController < ApplicationController
         params[:user][:password] = params[:password]    
         params[:user][:verification_code] = rand_string(20)
 
-        @user = User.new(user_params)
+        user = User.new(user_params)
 
-        if @user.save
+        if user.save
           render :json => @user.to_json, :status => 200
         else
           error_str = ""
 
-          @user.errors.each{|attr, msg|           
+          user.errors.each{|attr, msg|           
             error_str += "#{attr} - #{msg},"
           }
                     
@@ -172,7 +172,7 @@ class ApiController < ApplicationController
             else
               error_str = ""
 
-              @user.errors.each{|attr, msg|           
+              user.errors.each{|attr, msg|           
                 error_str += "#{attr} - #{msg},"
               }
                     
