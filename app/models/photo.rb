@@ -1,4 +1,6 @@
 class Photo < ActiveRecord::Base
+  attr_accessor :name
+  
   belongs_to :user
   
   def to_json(options={})
