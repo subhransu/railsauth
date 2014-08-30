@@ -164,15 +164,8 @@ class ApiController < ApplicationController
             s3_obj = bucket.objects[rand_id]
             s3_obj.write(image, :acl => :public_read)
             image_url = s3_obj.public_url.to_s
-            
-            params[:photo] = Hash.new    
-            params[:photo][:name] = image_name
-            params[:photo][:user_id] = user.id
-            params[:photo][:title] = params[:title]
-            params[:photo][:image_url] = image_url
-            params[:photo][:random_id] = rand_id
                                         
-            photo = Photo.new(photo_params)
+            photo = Photo.new(:name => image_name, :user_id => user.id, :title => params[:title], :image_url => image_url, :random_id => rand_id)
           
             if photo.save
               render :json => photo.to_json
@@ -286,8 +279,5 @@ class ApiController < ApplicationController
     params.require(:user).permit(:first_name, :last_name, :email, :password, :password_hash, :password_salt, :verification_code, 
     :email_verification, :api_authtoken, :authtoken_expiry)
   end
-  
-  def photo_params
-    params.require(:photo).permit(:name, :title, :user_id, :image_url, :random_id)
-  end
+    
 end

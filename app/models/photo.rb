@@ -1,5 +1,5 @@
 class Photo < ActiveRecord::Base
-  attr_accessor :name
+  attr_accessor :name, :title, :user_id, :image_url, :random_id
   
   belongs_to :user
   
