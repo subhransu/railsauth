@@ -16,7 +16,7 @@ gem 'coffee-rails', '~> 4.0.0'
 
 gem "bcrypt"
 gem "mini_magick"
-gem "aws-s3"
+gem "aws-sdk"
 
 # Use jquery as the JavaScript library
 gem 'jquery-rails'

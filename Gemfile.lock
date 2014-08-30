@@ -28,10 +28,11 @@ GEM
       thread_safe (~> 0.1)
       tzinfo (~> 1.1)
     arel (5.0.1.20140414130214)
-    aws-s3 (0.6.3)
-      builder
-      mime-types
-      xml-simple
+    aws-sdk (1.52.0)
+      aws-sdk-v1 (= 1.52.0)
+    aws-sdk-v1 (1.52.0)
+      json (~> 1.4)
+      nokogiri (>= 1.4.4)
     bcrypt (3.1.7)
     builder (3.2.2)
     coffee-rails (4.0.1)
@@ -58,8 +59,11 @@ GEM
     mime-types (1.25.1)
     mini_magick (3.8.0)
       subexec (~> 0.2.1)
+    mini_portile (0.6.0)
     minitest (5.4.0)
     multi_json (1.10.1)
+    nokogiri (1.6.3.1)
+      mini_portile (= 0.6.0)
     pg (0.17.1)
     polyglot (0.3.5)
     rack (1.5.2)
@@ -116,13 +120,12 @@ GEM
     uglifier (2.5.3)
       execjs (>= 0.3.0)
       json (>= 1.8.0)
-    xml-simple (1.1.4)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
-  aws-s3
+  aws-sdk
   bcrypt
   coffee-rails (~> 4.0.0)
   jbuilder (~> 2.0)
