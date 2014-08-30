@@ -164,7 +164,7 @@ class ApiController < ApplicationController
             s3_obj = bucket.objects[rand_id]
             s3_obj.write(image, :acl => :public_read)
             image_url = s3_obj.public_url.to_s
-                                        
+                                                    
             photo = Photo.new(:name => image_name, :user_id => user.id, :title => params[:title], :image_url => image_url, :random_id => rand_id)
           
             if photo.save
