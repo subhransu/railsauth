@@ -1,5 +1,6 @@
 class ApiController < ApplicationController  
-  before_action :signup_key_verification, :only => [:signup, :signin, :get_token]
+  http_basic_authenticate_with name:ENV["API_AUTH_NAME"], password:name:ENV["API_AUTH_PASSWORD"], :only => [:signup, :signin, :get_token]  
+  before_filter :check_for_valid_authtoken, :except => [:signup, :signin, :get_token]
   
   def signup
     if request.post?
@@ -9,9 +10,10 @@ class ApiController < ApplicationController
         params[:user][:first_name] = params[:full_name].split(" ").first
         params[:user][:last_name] = params[:full_name].split(" ").last
         params[:user][:email] = params[:email]
+        params[:passsword] = AESCrypt.decrypt(params[:passsword], ENV["API_AUTH_PASSWORD"])
         params[:user][:password] = params[:password]    
         params[:user][:verification_code] = rand_string(20)
-
+        
         user = User.new(user_params)
 
         if user.save
@@ -34,25 +36,26 @@ class ApiController < ApplicationController
   end
 
   def signin
-    if params && params[:email] && params[:password]      
+    if params && params[:email] && params[:password]        
       user = User.where(:email => params[:email]).first
-      
-      if user         
-        if User.authenticate(params[:email], params[:password])            
+                      
+      if user 
+        if User.authenticate(params[:email], params[:password]) 
+                    
           if !user.authtoken_expiry || user.authtoken_expiry < Time.now
             auth_token = rand_string(20)
             auth_expiry = Time.now + (24*60*60)
           
             user.update_attributes(:api_authtoken => auth_token, :authtoken_expiry => auth_expiry)          
           end 
-            
+                                   
           render :json => user.to_json, :status => 200
         else
           e = Error.new(:status => 401, :message => "Wrong Password")
           render :json => e.to_json, :status => 401
-        end
+        end      
       else
-        e = Error.new(:status => 400, :message => "No user record found for this email ID")
+        e = Error.new(:status => 400, :message => "No USER found by this email ID")
         render :json => e.to_json, :status => 400
       end
     else
@@ -62,20 +65,19 @@ class ApiController < ApplicationController
   end
   
   def reset_password
-    if params && params[:authtoken] && params[:email] && params[:old_password] && params[:new_password]   
+    if params && params[:email] && params[:old_password] && params[:new_password]   
       user = User.where(:email => params[:email]).first
       
       if user         
-        if user.api_authtoken == params[:authtoken] && user.authtoken_expiry > Time.now
+        if user.authtoken_expiry > Time.now
           if User.authenticate(params[:email], params[:old_password])  
+            
             auth_token = rand_string(20)
             auth_expiry = Time.now + (24*60*60)
+            new_password = AESCrypt.decrypt(params[:new_password], ENV["API_AUTH_PASSWORD"])  
                       
-            user.update_attributes(:password => params[:new_password], :api_authtoken => auth_token, :authtoken_expiry => auth_expiry)
-            render :json => user.to_json, :status => 200
-            
-            # m = Message.new(:status => 200, :message => "Password is being reset!")
-            # render :json => m.to_json, :status => 200            
+            user.update_attributes(:password => new_password, :api_authtoken => auth_token, :authtoken_expiry => auth_expiry)
+            render :json => user.to_json, :status => 200           
           else
             e = Error.new(:status => 401, :message => "Wrong Password")
             render :json => e.to_json, :status => 401
@@ -252,12 +254,9 @@ class ApiController < ApplicationController
 
   private 
   
-  def signup_key_verification
-    if !(params[:api_key] == "tUklCPqBvhubzzYoaXKzEKLJgWHFNVcNijJuqlxCP" && 
-      params[:api_secret] == "VbxtrVWXefFBUGcOaCLNNpkLneXaqiNfJbLYrBIjc")
-      
-      e = Error.new(:status => 401, :message => "API credentials are missing or invalid")
-      render :json => e.to_json, :status => 401
+  def check_for_valid_authtoken
+    authenticate_or_request_with_http_token do |token, options|
+      @user = User.where(:api_authtoken => token).first      
     end
   end
   
@@ -266,13 +265,6 @@ class ApiController < ApplicationController
     string  =  (0..len).map{ o[rand(o.length)]  }.join
 
     return string
-  end
-
-  def rand_num(len)
-    o =  [('0'..'9')].map{|i| i.to_a}.flatten
-    number  =  (0..len).map{ o[rand(o.length)]  }.join
-
-    return number
   end
   
   def user_params

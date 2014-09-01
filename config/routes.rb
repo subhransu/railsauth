@@ -5,14 +5,14 @@ Rails.application.routes.draw do
 
   post 'api/signup'
   get 'api/signin'
-  get 'api/get_token'
-  
-  post 'api/clear_token'
   post 'api/reset_password'
 
   post 'api/upload_photo'
   post 'api/delete_photo'
   get 'api/get_photos'
+    
+  get 'api/get_token'  
+  post 'api/clear_token'
     
   match "*path", to: "application#page_not_found", via: :all
 

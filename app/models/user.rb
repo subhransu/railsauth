@@ -18,17 +18,26 @@ class User < ActiveRecord::Base
   end
   
   def self.authenticate(login_name, password)
-    users = self.where("email =?", login_name)
-        
-    if users
-      user = users.first      
-      if user && user.password_hash == BCrypt::Engine.hash_secret(password, user.password_salt)
+    user = self.where("email =?", login_name).first
+                   
+    if user 
+      begin
+        password = AESCrypt.decrypt(password, ENV["API_AUTH_PASSWORD"])      
+      rescue
+        puts "my error"
+      rescue Exception => e
+        puts "error - #{e.message}"
+      end
+              
+      if user.password_hash == BCrypt::Engine.hash_secret(password, user.password_salt)
         user
       else
         nil
       end
-    end    
-  end
+    else
+      nil
+    end
+  end    
     
   def to_json(options={})
     options[:except] ||= [:id, :password_hash, :password_salt, :email_verification, :verification_code, :created_at, :updated_at]

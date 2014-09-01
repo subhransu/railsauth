@@ -27,6 +27,7 @@ GEM
       minitest (~> 5.1)
       thread_safe (~> 0.1)
       tzinfo (~> 1.1)
+    aescrypt (1.0.0)
     arel (5.0.1.20140414130214)
     aws-sdk (1.52.0)
       aws-sdk-v1 (= 1.52.0)
@@ -127,6 +128,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  aescrypt
   aws-sdk
   bcrypt
   coffee-rails (~> 4.0.0)
