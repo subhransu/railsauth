@@ -10,8 +10,14 @@ class ApiController < ApplicationController
         params[:user][:first_name] = params[:full_name].split(" ").first
         params[:user][:last_name] = params[:full_name].split(" ").last
         params[:user][:email] = params[:email]
-        params[:passsword] = AESCrypt.decrypt(params[:passsword], ENV["API_AUTH_PASSWORD"])
-        params[:user][:password] = params[:password]    
+        
+        begin 
+          decrypted_pass = AESCrypt.decrypt(params[:password], ENV["API_AUTH_PASSWORD"])
+        rescue Exception => e
+          decrypted_pass = nil          
+        end
+                
+        params[:user][:password] = decrypted_pass  
         params[:user][:verification_code] = rand_string(20)
         
         user = User.new(user_params)
@@ -42,11 +48,11 @@ class ApiController < ApplicationController
       if user 
         if User.authenticate(params[:email], params[:password]) 
                     
-          if !user.authtoken_expiry || user.authtoken_expiry < Time.now
+          if !user.api_authtoken || (user.api_authtoken && user.authtoken_expiry < Time.now)
             auth_token = rand_string(20)
             auth_expiry = Time.now + (24*60*60)
           
-            user.update_attributes(:api_authtoken => auth_token, :authtoken_expiry => auth_expiry)          
+            user.update_attributes(:api_authtoken => auth_token, :authtoken_expiry => auth_expiry)    
           end 
                                    
           render :json => user.to_json, :status => 200
@@ -65,34 +71,44 @@ class ApiController < ApplicationController
   end
   
   def reset_password
-    if params && params[:email] && params[:old_password] && params[:new_password]   
-      user = User.where(:email => params[:email]).first
-      
-      if user         
-        if user.authtoken_expiry > Time.now
-          if User.authenticate(params[:email], params[:old_password])  
+    if request.post?
+      if params && params[:old_password] && params[:new_password]         
+        if @user         
+          if @user.authtoken_expiry > Time.now
+            authenticate_user = User.authenticate(@user.email, params[:old_password])
+                        
+            if authenticate_user && !authenticate_user.nil?             
+              auth_token = rand_string(20)
+              auth_expiry = Time.now + (24*60*60)
             
-            auth_token = rand_string(20)
-            auth_expiry = Time.now + (24*60*60)
-            new_password = AESCrypt.decrypt(params[:new_password], ENV["API_AUTH_PASSWORD"])  
-                      
-            user.update_attributes(:password => new_password, :api_authtoken => auth_token, :authtoken_expiry => auth_expiry)
-            render :json => user.to_json, :status => 200           
+              begin
+                new_password = AESCrypt.decrypt(params[:new_password], ENV["API_AUTH_PASSWORD"])  
+              rescue Exception => e
+                new_password = nil
+                puts "error - #{e.message}"
+              end
+              
+              new_password_salt = BCrypt::Engine.generate_salt
+              new_password_digest = BCrypt::Engine.hash_secret(new_password, new_password_salt)
+                              
+              @user.update_attributes(:password => new_password, :api_authtoken => auth_token, :authtoken_expiry => auth_expiry, :password_salt => new_password_salt, :password_hash => new_password_digest)
+              render :json => @user.to_json, :status => 200           
+            else
+              e = Error.new(:status => 401, :message => "Wrong Password")
+              render :json => e.to_json, :status => 401
+            end
           else
-            e = Error.new(:status => 401, :message => "Wrong Password")
+            e = Error.new(:status => 401, :message => "Authtoken is invalid or has expired. Kindly refresh the token and try again!")
             render :json => e.to_json, :status => 401
           end
         else
-          e = Error.new(:status => 401, :message => "Authtoken is invalid or has expired. Kindly refresh the token and try again!")
-          render :json => e.to_json, :status => 401
+          e = Error.new(:status => 400, :message => "No user record found for this email ID")
+          render :json => e.to_json, :status => 400
         end
       else
-        e = Error.new(:status => 400, :message => "No user record found for this email ID")
+        e = Error.new(:status => 400, :message => "required parameters are missing")
         render :json => e.to_json, :status => 400
       end
-    else
-      e = Error.new(:status => 400, :message => "required parameters are missing")
-      render :json => e.to_json, :status => 400
     end
   end
   
@@ -101,11 +117,11 @@ class ApiController < ApplicationController
       user = User.where(:email => params[:email]).first
     
       if user 
-        if !user.authtoken_expiry || user.authtoken_expiry < Time.now
+        if !user.api_authtoken || (user.api_authtoken && user.authtoken_expiry < Time.now)          
           auth_token = rand_string(20)
           auth_expiry = Time.now + (24*60*60)
           
-          user.update_attributes(:api_authtoken => auth_token, :authtoken_expiry => auth_expiry)          
+          user.update_attributes(:api_authtoken => auth_token, :authtoken_expiry => auth_expiry)                              
         end        
         
         render :json => user.to_json(:only => [:api_authtoken, :authtoken_expiry])                
@@ -121,35 +137,21 @@ class ApiController < ApplicationController
   end
 
   def clear_token
-    if params && params[:authtoken] && params[:email]    
-      user = User.where(:email => params[:email]).first
-      
-      if user         
-        if user.api_authtoken == params[:authtoken] && user.authtoken_expiry > Time.now
-          user.update_attributes(:api_authtoken => nil, :authtoken_expiry => nil)
+    if @user.api_authtoken && @user.authtoken_expiry > Time.now
+      @user.update_attributes(:api_authtoken => nil, :authtoken_expiry => nil)
           
-          m = Message.new(:status => 200, :message => "Token cleared")          
-          render :json => m.to_json, :status => 200  
-        else
-          e = Error.new(:status => 401, :message => "Authtoken is invalid or has expired. Kindly refresh the token and try again!")
-          render :json => e.to_json, :status => 401
-        end
-      else
-        e = Error.new(:status => 400, :message => "No user record found for this email ID")
-        render :json => e.to_json, :status => 400
-      end
+      m = Message.new(:status => 200, :message => "Token cleared")          
+      render :json => m.to_json, :status => 200  
     else
-      e = Error.new(:status => 400, :message => "required parameters are missing")
-      render :json => e.to_json, :status => 400
-    end
+      e = Error.new(:status => 401, :message => "You don't have permission to do this task")
+      render :json => e.to_json, :status => 401
+    end 
   end
   
   def upload_photo
     if request.post?
-      if params[:authtoken] && params[:title] && params[:image]
-        user = User.where(:api_authtoken => params[:authtoken]).first
-          
-        if user && user.authtoken_expiry > Time.now
+      if params[:title] && params[:image]          
+        if @user && @user.authtoken_expiry > Time.now
           rand_id = rand_string(40)
           image_name = params[:image].original_filename
           image = params[:image].read     
@@ -167,7 +169,7 @@ class ApiController < ApplicationController
             s3_obj.write(image, :acl => :public_read)
             image_url = s3_obj.public_url.to_s
                                                     
-            photo = Photo.new(:name => image_name, :user_id => user.id, :title => params[:title], :image_url => image_url, :random_id => rand_id)
+            photo = Photo.new(:name => image_name, :user_id => @user.id, :title => params[:title], :image_url => image_url, :random_id => rand_id)
           
             if photo.save
               render :json => photo.to_json
@@ -186,7 +188,7 @@ class ApiController < ApplicationController
             render :json => e.to_json, :status => 401              
           end
         else
-          e = Error.new(:status => 401, :message => "Authtoken is invalid or has expired. Kindly refresh the token and try again!")
+          e = Error.new(:status => 401, :message => "Authtoken has expired")
           render :json => e.to_json, :status => 401
         end
       else
@@ -197,14 +199,12 @@ class ApiController < ApplicationController
   end
 
   def delete_photo
-    if request.post?
-      if params[:authtoken] && params[:photo_id]
-        user = User.where(:api_authtoken => params[:authtoken]).first
-          
-        if user && user.authtoken_expiry > Time.now
+    if request.delete?
+      if params[:photo_id]          
+        if @user && @user.authtoken_expiry > Time.now
           photo = Photo.where(:random_id => params[:photo_id]).first
           
-          if photo && photo.user_id == user.id            
+          if photo && photo.user_id == @user.id            
             s3 = AWS::S3.new
             
             if s3
@@ -225,7 +225,7 @@ class ApiController < ApplicationController
             render :json => e.to_json, :status => 401
           end
         else
-          e = Error.new(:status => 401, :message => "Authtoken is invalid or has expired. Kindly refresh the token and try again!")
+          e = Error.new(:status => 401, :message => "Authtoken has expired. Please get a new token and try again!")
           render :json => e.to_json, :status => 401
         end
       else
@@ -235,27 +235,20 @@ class ApiController < ApplicationController
     end
   end
 
-  def get_photos
-    if params[:authtoken]
-      user = User.where(:api_authtoken => params[:authtoken]).first
-        
-      if user && user.authtoken_expiry > Time.now
-        photos = user.photos
-        render :json => photos.to_json, :status => 200          
-      else
-        e = Error.new(:status => 401, :message => "Authtoken is invalid or has expired. Kindly refresh the token and try again!")
-        render :json => e.to_json, :status => 401
-      end
+  def get_photos    
+    if @user && @user.authtoken_expiry > Time.now
+      photos = @user.photos
+      render :json => photos.to_json, :status => 200
     else
-      e = Error.new(:status => 400, :message => "required parameters are missing")
-      render :json => e.to_json, :status => 400
+      e = Error.new(:status => 401, :message => "Authtoken has expired. Please get a new token and try again!")
+      render :json => e.to_json, :status => 401
     end
   end
 
   private 
   
   def check_for_valid_authtoken
-    authenticate_or_request_with_http_token do |token, options|
+    authenticate_or_request_with_http_token do |token, options|     
       @user = User.where(:api_authtoken => token).first      
     end
   end
