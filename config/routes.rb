@@ -4,7 +4,7 @@ Rails.application.routes.draw do
   get 'home/index'
 
   post 'api/signup'
-  get 'api/signin'
+  post 'api/signin'
   post 'api/reset_password'
 
   post 'api/upload_photo'
