@@ -27,3 +27,6 @@ db/schema.rb
 
 #local photo uploads
 /public/uploads
+
+#Mac Specific
+.DS_Store
